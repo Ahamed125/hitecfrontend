@@ -90,7 +90,7 @@ const HeroSection = () => {
       }
 
     } catch (error) {
-      console.error('Error loading hero section data:', error);
+      console.error('Error loading Hi-Tec data:', error);
     } finally {
       setLoading(false);
     }
@@ -174,7 +174,7 @@ const HeroSection = () => {
       <section className="relative min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 overflow-hidden flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading hero section...</p>
+          <p className="mt-4 text-muted-foreground">Loading Hi-Tec</p>
         </div>
       </section>
     );
