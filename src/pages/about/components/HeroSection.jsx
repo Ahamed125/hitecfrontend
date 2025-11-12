@@ -328,6 +328,7 @@ const HeroSection = () => {
                 variant="outline" 
                 size="lg" 
                 className="border-white text-white hover:bg-white hover:text-primary"
+                onClick={() => window.open('/courses')}
               >
                 <Icon name="ArrowDown" size={20} className="mr-2" />
                 {heroData?.exploreButtonText || 'Explore More'}
@@ -385,3 +386,12 @@ const HeroSection = () => {
 };
 
 export default HeroSection;
+
+
+
+
+
+
+
+
+
