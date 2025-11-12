@@ -8,9 +8,14 @@ const FAQ = () => {
   const [faqCategories, setFaqCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [contactInfo, setContactInfo] = useState({
-    phone: '+94773066411',
-    email: 'ainudeen@gmail.com'
+  const [pageSettings, setPageSettings] = useState({
+    sectionSubtitle: 'Common Questions',
+    sectionTitle: 'Frequently Asked Questions',
+    sectionDescription: 'Find answers to the most common questions about admissions, programs, and student life.',
+    contactTitle: 'Still Have Questions?',
+    contactDescription: "Can't find the answer you're looking for? Our admissions team is here to help with any specific questions about programs, requirements, or the application process.",
+    contactPhone: '+94773066411',
+    contactEmail: 'ainudeen@gmail.com'
   });
 
   useEffect(() => {
@@ -22,9 +27,20 @@ const FAQ = () => {
       setLoading(true);
       const result = await loadFromFirebase(COLLECTIONS.FAQS);
       
+      console.log('Firebase FAQ Data:', result); // Debug log
+      
       if (result.success && result.data) {
+        // Load page settings from FAQ data
+        if (result.data.pageSettings) {
+          setPageSettings(prev => ({
+            ...prev,
+            ...result.data.pageSettings
+          }));
+        }
+
         // Transform the Firebase data structure to match component needs
         const transformedCategories = transformFAQData(result.data);
+        console.log('Transformed Categories:', transformedCategories); // Debug log
         setFaqCategories(transformedCategories);
         
         // Open first FAQ item by default if available
@@ -33,11 +49,12 @@ const FAQ = () => {
         }
       } else {
         // Fallback to default data
+        console.log('Using default FAQs - No Firebase data');
         setFaqCategories(getDefaultFAQs());
         setOpenItems(new Set([1762349101485])); // Default first item ID
       }
 
-      // Load contact info from Firebase
+      // Load contact info from Firebase as backup
       await loadContactInfo();
     } catch (err) {
       console.error('Error loading FAQs:', err);
@@ -50,19 +67,26 @@ const FAQ = () => {
   };
 
   const transformFAQData = (firebaseData) => {
-    if (!firebaseData.categories) return getDefaultFAQs();
+    if (!firebaseData.categories || !Array.isArray(firebaseData.categories)) {
+      console.log('No categories found in Firebase data, using default');
+      return getDefaultFAQs();
+    }
     
-    return firebaseData.categories.map(category => ({
+    // Transform categories and sort by order
+    const categories = firebaseData.categories.map(category => ({
       id: category.id,
       title: category.title,
-      order: category.order,
-      items: category.items?.map(item => ({
+      order: category.order || 0,
+      items: (category.items || []).map(item => ({
         id: item.id,
         question: item.question,
         answer: item.answer,
-        order: item.order
-      })) || []
-    })).sort((a, b) => (a.order || 0) - (b.order || 0));
+        order: item.order || 0
+      })).sort((a, b) => (a.order || 0) - (b.order || 0)) // Sort FAQ items by order
+    })).sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort categories by order
+    
+    console.log('Processed categories:', categories);
+    return categories;
   };
 
   const loadContactInfo = async () => {
@@ -70,14 +94,22 @@ const FAQ = () => {
       const contactResult = await loadFromFirebase(COLLECTIONS.CONTACT);
       if (contactResult.success && contactResult.data) {
         const contactData = contactResult.data;
+        console.log('Contact data:', contactData); // Debug log
+        
         if (contactData.methods && contactData.methods.length > 0) {
-          const phoneMethod = contactData.methods.find(method => method.type === 'phone');
-          const emailMethod = contactData.methods.find(method => method.type === 'email');
+          // Use actionType instead of type based on your AdminContext structure
+          const phoneMethod = contactData.methods.find(method => method.actionType === 'phone');
+          const emailMethod = contactData.methods.find(method => method.actionType === 'email');
           
-          setContactInfo({
-            phone: phoneMethod?.primary || '+94773066411',
-            email: emailMethod?.primary || 'ainudeen@gmail.com'
-          });
+          console.log('Phone method:', phoneMethod); // Debug log
+          console.log('Email method:', emailMethod); // Debug log
+
+          // Update page settings with contact info if not already set from FAQ data
+          setPageSettings(prev => ({
+            ...prev,
+            contactPhone: prev.contactPhone === '+94773066411' ? (phoneMethod?.primary || prev.contactPhone) : prev.contactPhone,
+            contactEmail: prev.contactEmail === 'ainudeen@gmail.com' ? (emailMethod?.primary || prev.contactEmail) : prev.contactEmail
+          }));
         }
       }
     } catch (err) {
@@ -224,86 +256,109 @@ const FAQ = () => {
       <Header />
       <div className="pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Section Header */}
+          {/* Section Header - Dynamic from pageSettings */}
           <div className="text-center mb-16">
             <div className="flex items-center justify-center space-x-2 text-primary mb-4">
               <Icon name="HelpCircle" size={20} />
-              <span className="text-sm font-medium uppercase tracking-wider">Common Questions</span>
+              <span className="text-sm font-medium uppercase tracking-wider">
+                {pageSettings.sectionSubtitle || 'Common Questions'}
+              </span>
             </div>
             <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Frequently Asked Questions
+              {pageSettings.sectionTitle || 'Frequently Asked Questions'}
             </h2>
             <p className="text-xl text-muted-foreground">
-              Find answers to the most common questions about admissions, programs, and student life.
+              {pageSettings.sectionDescription || 'Find answers to the most common questions about admissions, programs, and student life.'}
             </p>
           </div>
 
           {/* FAQ Categories */}
           <div className="space-y-12">
-            {faqCategories?.map((category) => (
-              <div key={category.id}>
-                <h3 className="text-xl font-semibold text-foreground mb-6 pb-2 border-b border-border">
-                  {category.title}
-                </h3>
-                
-                <div className="space-y-4">
-                  {category.items?.map((faq) => (
-                    <div
-                      key={faq.id}
-                      className="bg-card rounded-lg border border-border overflow-hidden transition-all duration-200 hover:shadow-md"
-                    >
-                      <button
-                        onClick={() => toggleItem(faq.id)}
-                        className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-muted/50 transition-colors duration-200"
-                      >
-                        <span className="text-lg font-medium text-card-foreground pr-4">
-                          {faq.question}
-                        </span>
-                        <Icon
-                          name={openItems.has(faq.id) ? "ChevronUp" : "ChevronDown"}
-                          size={20}
-                          className="text-muted-foreground flex-shrink-0 transition-transform duration-200"
-                        />
-                      </button>
-                      
-                      {openItems.has(faq.id) && (
-                        <div className="px-6 pb-4">
-                          <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                            {faq.answer}
-                          </div>
+            {faqCategories && faqCategories.length > 0 ? (
+              faqCategories.map((category) => (
+                <div key={category.id || category.title}>
+                  <h3 className="text-xl font-semibold text-foreground mb-6 pb-2 border-b border-border">
+                    {category.title}
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {category.items && category.items.length > 0 ? (
+                      category.items.map((faq) => (
+                        <div
+                          key={faq.id}
+                          className="bg-card rounded-lg border border-border overflow-hidden transition-all duration-200 hover:shadow-md"
+                        >
+                          <button
+                            onClick={() => toggleItem(faq.id)}
+                            className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-muted/50 transition-colors duration-200"
+                          >
+                            <span className="text-lg font-medium text-card-foreground pr-4">
+                              {faq.question}
+                            </span>
+                            <Icon
+                              name={openItems.has(faq.id) ? "ChevronUp" : "ChevronDown"}
+                              size={20}
+                              className="text-muted-foreground flex-shrink-0 transition-transform duration-200"
+                            />
+                          </button>
+                          
+                          {openItems.has(faq.id) && (
+                            <div className="px-6 pb-4">
+                              <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
+                                {faq.answer}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Icon name="HelpCircle" size={32} className="mx-auto mb-2" />
+                        <p>No questions available in this category.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <Icon name="HelpCircle" size={64} className="mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">No FAQs Available</h3>
+                <p className="text-muted-foreground">
+                  There are no frequently asked questions available at the moment. Please check back later.
+                </p>
               </div>
-            ))}
+            )}
           </div>
 
-          {/* Still Have Questions */}
+          {/* Still Have Questions Section - Dynamic from pageSettings */}
           <div className="mt-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-8 text-center text-white">
             <Icon name="MessageCircle" size={48} className="mx-auto mb-4 text-blue-200" />
-            <h3 className="text-2xl font-semibold mb-4">Still Have Questions?</h3>
+            <h3 className="text-2xl font-semibold mb-4">
+              {pageSettings.contactTitle || 'Still Have Questions?'}
+            </h3>
             <p className="text-white/90 mb-6 max-w-2xl mx-auto">
-              Can't find the answer you're looking for? Our admissions team is here to help with any specific questions about programs, requirements, or the application process.
+              {pageSettings.contactDescription || "Can't find the answer you're looking for? Our admissions team is here to help with any specific questions about programs, requirements, or the application process."}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a 
-                href={`tel:${contactInfo.phone}`}
+                href={`tel:${pageSettings.contactPhone}`}
                 className="bg-blue-500 hover:bg-blue-400 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center"
               >
                 <Icon name="Phone" size={18} className="mr-2" />
-                Call: {contactInfo.phone}
+                Call: {pageSettings.contactPhone}
               </a>
               <a 
-                href={`mailto:${contactInfo.email}`}
+                href={`mailto:${pageSettings.contactEmail}`}
                 className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center"
               >
                 <Icon name="Mail" size={18} className="mr-2" />
-                Email: {contactInfo.email}
+                Email: {pageSettings.contactEmail}
               </a>
             </div>
           </div>
+
+
         </div>
       </div>
     </section>
